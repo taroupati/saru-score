@@ -13,8 +13,18 @@ class Saru():
         }
         f.close()
         self.LOGIN_URL = "https://p.eagate.573.jp/gate/p/login.html"
+        self.RIVAL_URL = "https://p.eagate.573.jp/game/sdvx/iv/p/playdata/rival/score.html"
         self.session = requests.Session()
     
+    def set_rival_ids(self, rival_ids):
+        import yaml
+        f = open(rival_ids, 'r')
+        data = yaml.load(f)
+        self.rival_ids = {}
+        for k, v in data.items():
+            self.rival_ids[k] = v
+        f.close()
+
     def set_queries(self):
         response = requests.get(self.LOGIN_URL)
         response.encoding = response.apparent_encoding
@@ -93,10 +103,35 @@ class Saru():
         r.encoding = r.apparent_encoding
         # with open("test.html", mode='w') as f:
         #     f.write(r.text)
+    
+    def get_rival_score_page(self, rival_name, level, page):
+        post_data = {
+            "rival_id": self.rival_ids[rival_name],
+            "sort_id": 0,
+            "chkLv"+str(level): "on",
+            "Submit": "",
+            "page": page
+        }
+        r = self.session.post(self.RIVAL_URL, data=post_data)
+        r.encoding = r.apparent_encoding
+        with open("test.html", mode='w') as f:
+            f.write(r.text)
+        import pdb; pdb.set_trace()
+    
+    def save_rival_scores(self, rival_ids):
+        self.set_rival_ids(rival_ids)
+        for k, v in self.rival_ids.items():
+            self.session.post(self.RIVAL_URL, data={"rival_id": v})
+            # TODO page_numで各難易度のページ数を取得しておく
+            self.get_rival_score_page(k, 18, 1)
+
+
 
 
 if __name__ == '__main__':
     saru = Saru("config.yml")
     saru.login()
+    saru.save_rival_scores("rival_ids.yml")
+
 
 
