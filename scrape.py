@@ -18,10 +18,27 @@ class Saru():
 
         # TODO page_numで各難易度のページ数を取得しておく
         self.level_pages = {
+            14: 8,
             17: 18,
             18: 11,
             19: 3,
             20: 1
+        }
+
+        self.clear_mark = {
+            "mark_per.png": "P",
+            "mark_uc.png": "UC",
+            "mark_comp_ex.png": "EX",
+            "mark_comp.png": "C",
+            "mark_play.png": "NC"
+        }
+
+        self.difficulty = {
+            "NOV": "NOV",
+            "ADV": "ADV",
+            "EXH": "EXH",
+            "MXM": "MXM",
+            "HVN": "INF-GRV-HVN"
         }
     
     def set_rival_ids(self, rival_ids):
@@ -121,10 +138,16 @@ class Saru():
         }
         r = self.session.post(self.RIVAL_URL, data=post_data)
         r.encoding = r.apparent_encoding
+        # debug
+        with open("test.html", mode='w') as f:
+            f.write(r.text)
+        # import pdb; pdb.set_trace()
+
         return r
     
     def save_my_scores(self):
         pass
+    
     
     def get_rival_scores(self, rival_name, music_level):
         score_data = {}
@@ -139,21 +162,31 @@ class Saru():
             music_names = []
             for name in music_list:
                 music_names.append(name.text)
-            rival_scores_3 = []
-            for score in soup.find_all('td', id="score_col_3"):
-                rival_scores_3.append(score.text)
-            rival_scores_4 = []
-            for score in soup.find_all('td', id="score_col_4"):
-                rival_scores_4.append(score.text)
+            rival_scores_3 = soup.find_all('td', id="score_col_3")
+            rival_scores_4 = soup.find_all('td', id="score_col_4")
+
             for i, name in enumerate(music_names):
-                rival_score = {name: "0"}
+                rival_score = {
+                    name: {
+                        "NOV": [0, "NP"],
+                        "ADV": [0, "NP"],
+                        "EXH": [0, "NP"],
+                        "MXM": [0, "NP"],
+                        "INF-GRV-HVN": [0, "NP"]
+                    }
+                }
                 for j in range(3):
-                    if rival_scores_3[i*3+j] != "--0":
-                        rival_score[name] = rival_scores_3[i*3+j]
+                    score = rival_scores_3[i*3+j]
+                    if score.text != "--0":
+                        difficulty = self.difficulty[score.findPrevious().text]
+                        rival_score[name][difficulty] = [score.text, self.clear_mark[score.find("img")["src"][37:]]]
                 for j in range(2):
-                    if rival_scores_4[i*2+j] != "--0":
-                        rival_score[name] = rival_scores_4[i*2+j]
+                    score = rival_scores_4[i*2+j]
+                    if score.text != "--0":
+                        difficulty = self.difficulty[score.findPrevious().text]
+                        rival_score[name][difficulty] = [score.text, self.clear_mark[score.find("img")["src"][37:]]]
                 score_data[rival_name][music_level].append(rival_score)
+
         return score_data
 
 
@@ -164,6 +197,3 @@ if __name__ == '__main__':
     for rival_name in saru.rival_ids.keys():
         score = saru.get_rival_scores(rival_name, 19)
         import pdb; pdb.set_trace()
-
-
-
