@@ -145,9 +145,45 @@ class Saru():
 
         return r
     
-    def save_my_scores(self):
-        pass
-    
+    def get_my_scores(self, rival_name, music_level):
+        my_score_data = {}
+        self.session.post(self.RIVAL_URL, data={"rival_id": self.rival_ids[rival_name]})
+        my_score_data[music_level] = []
+
+        for i in range(self.level_pages[music_level]):
+            html = self.get_rival_score_page(self.rival_ids[rival_name], music_level, i+1)
+            soup = BeautifulSoup(html.text, "html.parser")
+            music_list = soup.find_all('span', id="music_name")
+            music_names = []
+            for name in music_list:
+                music_names.append(name.text)
+            my_scores_1 = soup.find_all('td', id="score_col_1")
+            my_scores_2 = soup.find_all('td', id="score_col_2")
+
+            for i, name in enumerate(music_names):
+                my_score = {
+                    name: {
+                        "NOV": [0, "NP"],
+                        "ADV": [0, "NP"],
+                        "EXH": [0, "NP"],
+                        "MXM": [0, "NP"],
+                        "INF-GRV-HVN": [0, "NP"]
+                    }
+                }
+                for j in range(3):
+                    score = my_scores_1[i*3+j]
+                    if score.text != "--0":
+                        difficulty = self.difficulty[score.findPrevious().text]
+                        my_score[name][difficulty] = [int(score.text), self.clear_mark[score.find("img")["src"][37:]]]
+                for j in range(2):
+                    score = my_scores_2[i*2+j]
+                    if score.text != "--0":
+                        difficulty = self.difficulty[score.findPrevious().text]
+                        my_score[name][difficulty] = [int(score.text), self.clear_mark[score.find("img")["src"][37:]]]
+                my_score_data[music_level].append(my_score)
+
+        return my_score_data
+
     
     def get_rival_scores(self, rival_name, music_level):
         score_data = {}
@@ -179,21 +215,31 @@ class Saru():
                     score = rival_scores_3[i*3+j]
                     if score.text != "--0":
                         difficulty = self.difficulty[score.findPrevious().text]
-                        rival_score[name][difficulty] = [score.text, self.clear_mark[score.find("img")["src"][37:]]]
+                        rival_score[name][difficulty] = [int(score.text), self.clear_mark[score.find("img")["src"][37:]]]
                 for j in range(2):
                     score = rival_scores_4[i*2+j]
                     if score.text != "--0":
                         difficulty = self.difficulty[score.findPrevious().text]
-                        rival_score[name][difficulty] = [score.text, self.clear_mark[score.find("img")["src"][37:]]]
+                        rival_score[name][difficulty] = [int(score.text), self.clear_mark[score.find("img")["src"][37:]]]
                 score_data[rival_name][music_level].append(rival_score)
 
         return score_data
 
-
 if __name__ == '__main__':
+    import json
     saru = Saru("config.yml")
     saru.login()
     saru.set_rival_ids("rival_ids.yml")
-    for rival_name in saru.rival_ids.keys():
-        score = saru.get_rival_scores(rival_name, 19)
-        import pdb; pdb.set_trace()
+    rival_scores = {}
+    
+    for music_level in range(17, 21):
+        for i, rival_name in enumerate(saru.rival_ids.keys()):
+            if i == 0:
+                my_score = saru.get_my_scores(rival_name, music_level)
+                text = json.dumps(my_score, ensure_ascii=False, indent=2)
+                with open("score_data/"+str(music_level)+"/my_score.json", "w", encoding="utf-8") as f:
+                    f.write(text)
+            rival_scores.update(saru.get_rival_scores(rival_name, music_level))
+        text = json.dumps(rival_scores, ensure_ascii=False, indent=2)
+        with open("score_data/"+str(music_level)+"/rival_score.json", "w", encoding="utf-8") as f:
+            f.write(text)
