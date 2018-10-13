@@ -15,6 +15,14 @@ class Saru():
         self.LOGIN_URL = "https://p.eagate.573.jp/gate/p/login.html"
         self.RIVAL_URL = "https://p.eagate.573.jp/game/sdvx/iv/p/playdata/rival/score.html"
         self.session = requests.Session()
+
+        # TODO page_numで各難易度のページ数を取得しておく
+        self.level_pages = {
+            17: 18,
+            18: 11,
+            19: 3,
+            20: 1
+        }
     
     def set_rival_ids(self, rival_ids):
         import yaml
@@ -97,16 +105,15 @@ class Saru():
     
     def login(self):
         self.set_queries()
-        from time import sleep
-        sleep(2)
+        # from time import sleep
+        # sleep(2)
         r = self.session.post(self.LOGIN_URL, data=self.post_data)
         r.encoding = r.apparent_encoding
-        # with open("test.html", mode='w') as f:
-        #     f.write(r.text)
+        # TODO ログインに成功したかどうか確認する
     
-    def get_rival_score_page(self, rival_name, level, page):
+    def get_rival_score_page(self, rival_id, level, page):
         post_data = {
-            "rival_id": self.rival_ids[rival_name],
+            "rival_id": rival_id,
             "sort_id": 0,
             "chkLv"+str(level): "on",
             "Submit": "",
@@ -114,24 +121,49 @@ class Saru():
         }
         r = self.session.post(self.RIVAL_URL, data=post_data)
         r.encoding = r.apparent_encoding
-        with open("test.html", mode='w') as f:
-            f.write(r.text)
-        import pdb; pdb.set_trace()
+        return r
     
-    def save_rival_scores(self, rival_ids):
-        self.set_rival_ids(rival_ids)
-        for k, v in self.rival_ids.items():
-            self.session.post(self.RIVAL_URL, data={"rival_id": v})
-            # TODO page_numで各難易度のページ数を取得しておく
-            self.get_rival_score_page(k, 18, 1)
+    def save_my_scores(self):
+        pass
+    
+    def get_rival_scores(self, rival_name, music_level):
+        score_data = {}
+        score_data[rival_name] = {}
+        self.session.post(self.RIVAL_URL, data={"rival_id": self.rival_ids[rival_name]})
+        score_data[rival_name][music_level] = []
 
-
+        for i in range(self.level_pages[music_level]):
+            html = self.get_rival_score_page(self.rival_ids[rival_name], music_level, i+1)
+            soup = BeautifulSoup(html.text, "html.parser")
+            music_list = soup.find_all('span', id="music_name")
+            music_names = []
+            for name in music_list:
+                music_names.append(name.text)
+            rival_scores_3 = []
+            for score in soup.find_all('td', id="score_col_3"):
+                rival_scores_3.append(score.text)
+            rival_scores_4 = []
+            for score in soup.find_all('td', id="score_col_4"):
+                rival_scores_4.append(score.text)
+            for i, name in enumerate(music_names):
+                rival_score = {name: "0"}
+                for j in range(3):
+                    if rival_scores_3[i*3+j] != "--0":
+                        rival_score[name] = rival_scores_3[i*3+j]
+                for j in range(2):
+                    if rival_scores_4[i*2+j] != "--0":
+                        rival_score[name] = rival_scores_4[i*2+j]
+                score_data[rival_name][music_level].append(rival_score)
+        return score_data
 
 
 if __name__ == '__main__':
     saru = Saru("config.yml")
     saru.login()
-    saru.save_rival_scores("rival_ids.yml")
+    saru.set_rival_ids("rival_ids.yml")
+    for rival_name in saru.rival_ids.keys():
+        score = saru.get_rival_scores(rival_name, 19)
+        import pdb; pdb.set_trace()
 
 
 
