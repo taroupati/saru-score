@@ -1,17 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
 import json
+import yaml
 
 class Saru():
     def __init__(self, config):
-        import yaml
-        with open(config, 'r') as f:
-            data = yaml.load(f)
-        self.post_data = {
-            "KID": data["KID"],
-            "pass": data["pass"],
-            "OTP": ""
-        }
+        self.config = config
         self.LOGIN_URL = "https://p.eagate.573.jp/gate/p/login.html"
         self.RIVAL_URL = "https://p.eagate.573.jp/game/sdvx/iv/p/playdata/rival/score.html"
         self.session = requests.Session()
@@ -42,18 +36,22 @@ class Saru():
             "MXM": "MXM",
             "HVN": "INF-GRV-HVN"
         }
-        self.login()
     
     def set_rival_ids(self, rival_ids):
-        import yaml
-        f = open(rival_ids, 'r')
-        data = yaml.load(f)
+        with open(rival_ids, 'r') as f:
+            data = yaml.load(f)
         self.rival_ids = {}
         for k, v in data.items():
             self.rival_ids[k] = v
-        f.close()
 
     def set_queries(self):
+        with open(self.config, 'r') as f:
+            data = yaml.load(f)
+        self.post_data = {
+            "KID": data["KID"],
+            "pass": data["pass"],
+            "OTP": ""
+        }
         response = requests.get(self.LOGIN_URL)
         response.encoding = response.apparent_encoding
         soup = BeautifulSoup(response.text)
@@ -125,11 +123,15 @@ class Saru():
     
     def login(self):
         self.set_queries()
-        # from time import sleep
-        # sleep(2)
         r = self.session.post(self.LOGIN_URL, data=self.post_data)
         r.encoding = r.apparent_encoding
-        # TODO ログインに成功したかどうか確認する
+        soup = BeautifulSoup(r.text)
+        div = soup.find('a', href="https://p.eagate.573.jp/gate/p/logout.html")
+        if div is None:
+            print("ログインに失敗しました。")
+            return False
+        print("ログインに成功しました。")
+        return True
     
     def get_rival_score_page(self, rival_id, level, page):
         post_data = {
