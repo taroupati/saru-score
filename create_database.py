@@ -1,10 +1,11 @@
 import json
 import yaml
 import pandas as pd
+import requests
 
 
 class DBManager():
-    def __init__(self, rival_ids):
+    def __init__(self, rival_ids, slack_config):
         with open(rival_ids, 'r') as f:
             data = yaml.load(f)
         self.rival_ids = {}
@@ -21,6 +22,11 @@ class DBManager():
             "UC": 3,
             "P": 4
         }
+        with open(slack_config, 'r') as f:
+            data = yaml.load(f)
+            self.slack_token = data["token"]
+            self.slack_channel = data["channel"]
+
     
     def set_database(self, db_name):
         self.cur.execute(f"use {db_name};")
@@ -119,6 +125,18 @@ class DBManager():
             table = self.get_compare_table(rival_name,music_level)
             new_table = self.get_updated_score(table, rival_name, music_level)
             if len(new_table) > 0:
-                print(f"{rival_name}に抜かれました。")
-                print(new_table)
+                text = f"{rival_name}に抜かれました。\n ``` "
+                for index, row in new_table.iterrows():
+                    text += "・" + row[0] + " (" + row[1] + ", " + str(row[2]) + ")\n" + str(row[5]) + " : " + row[6] + "\n"
+                text += " ``` "
+                self.send_message_to_slack(text)
             table.to_csv(f"score_data/{music_level}/{rival_name}.csv", index=False)
+
+    def send_message_to_slack(self, text):
+        url = "https://slack.com/api/chat.postMessage"
+        post_data = {
+            "token": self.slack_token,
+            "channel": self.slack_channel,
+            "text": text
+        } 
+        response = requests.post(url, data=post_data)
