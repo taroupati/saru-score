@@ -1,17 +1,17 @@
 import requests
 from bs4 import BeautifulSoup
+import json
 
 class Saru():
     def __init__(self, config):
         import yaml
-        f = open(config, 'r')
-        data = yaml.load(f)
+        with open(config, 'r') as f:
+            data = yaml.load(f)
         self.post_data = {
             "KID": data["KID"],
             "pass": data["pass"],
             "OTP": ""
         }
-        f.close()
         self.LOGIN_URL = "https://p.eagate.573.jp/gate/p/login.html"
         self.RIVAL_URL = "https://p.eagate.573.jp/game/sdvx/iv/p/playdata/rival/score.html"
         self.session = requests.Session()
@@ -19,6 +19,8 @@ class Saru():
         # TODO page_numで各難易度のページ数を取得しておく
         self.level_pages = {
             14: 8,
+            15: 14,
+            16: 17,
             17: 18,
             18: 11,
             19: 3,
@@ -40,6 +42,7 @@ class Saru():
             "MXM": "MXM",
             "HVN": "INF-GRV-HVN"
         }
+        self.login()
     
     def set_rival_ids(self, rival_ids):
         import yaml
@@ -94,7 +97,7 @@ class Saru():
         target_img = cv2.resize(target_img, IMG_SIZE)
         target_hist = cv2.calcHist([target_img], [0], None, [256], [0, 256])
 
-        print('TARGET_FILE: %s' % (TARGET_FILE))
+        # print('TARGET_FILE: %s' % (TARGET_FILE))
 
         scores = {}
         files = os.listdir("imgs")
@@ -109,7 +112,7 @@ class Saru():
 
             ret = cv2.compareHist(target_hist, comparing_hist, 0)
             scores[i-1] = ret
-            print(file, ret)
+            # print(file, ret)
 
         return scores
 
@@ -181,7 +184,7 @@ class Saru():
                         difficulty = self.difficulty[score.findPrevious().text]
                         my_score[name][difficulty] = [int(score.text), self.clear_mark[score.find("img")["src"][37:]]]
                 my_score_data[music_level].append(my_score)
-
+        print(f"my score level:{music_level} 取得完了")
         return my_score_data
 
     
@@ -222,24 +225,31 @@ class Saru():
                         difficulty = self.difficulty[score.findPrevious().text]
                         rival_score[name][difficulty] = [int(score.text), self.clear_mark[score.find("img")["src"][37:]]]
                 score_data[rival_name][music_level].append(rival_score)
-
+        print(f"{rival_name} score level:{music_level} 取得完了")
         return score_data
-
-if __name__ == '__main__':
-    import json
-    saru = Saru("config.yml")
-    saru.login()
-    saru.set_rival_ids("rival_ids.yml")
-    rival_scores = {}
     
-    for music_level in range(17, 21):
-        for i, rival_name in enumerate(saru.rival_ids.keys()):
+    def save_score(self, music_level):
+        rival_score = {}
+        my_score = {}
+        
+        for i, rival_name in enumerate(self.rival_ids.keys()):
             if i == 0:
-                my_score = saru.get_my_scores(rival_name, music_level)
+                try:
+                    my_score = self.get_my_scores(rival_name, music_level)
+                except RemoteDisconnected as e:
+                    print(e)
+                    return False
                 text = json.dumps(my_score, ensure_ascii=False, indent=2)
                 with open("score_data/"+str(music_level)+"/my_score.json", "w", encoding="utf-8") as f:
                     f.write(text)
-            rival_scores.update(saru.get_rival_scores(rival_name, music_level))
-        text = json.dumps(rival_scores, ensure_ascii=False, indent=2)
-        with open("score_data/"+str(music_level)+"/rival_score.json", "w", encoding="utf-8") as f:
-            f.write(text)
+            try:
+                rival_score = self.get_rival_scores(rival_name, music_level)
+            except RemoteDisconnected as e:
+                print(e)
+                return False
+            text = json.dumps(rival_score, ensure_ascii=False, indent=2)
+            with open("score_data/"+str(music_level)+f"/{rival_name}_score.json", "w", encoding="utf-8") as f:
+                f.write(text)
+
+        return True
+
