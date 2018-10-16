@@ -10,17 +10,6 @@ class Saru():
         self.RIVAL_URL = "https://p.eagate.573.jp/game/sdvx/iv/p/playdata/rival/score.html"
         self.session = requests.Session()
 
-        # TODO page_numで各難易度のページ数を取得しておく
-        self.level_pages = {
-            14: 8,
-            15: 14,
-            16: 17,
-            17: 18,
-            18: 11,
-            19: 3,
-            20: 1
-        }
-
         self.clear_mark = {
             "mark_per.png": "P",
             "mark_uc.png": "UC",
@@ -143,22 +132,86 @@ class Saru():
         }
         r = self.session.post(self.RIVAL_URL, data=post_data)
         r.encoding = r.apparent_encoding
-        # debug
-        with open("test.html", mode='w') as f:
-            f.write(r.text)
+        # # debug
+        # with open("test.html", mode='w') as f:
+        #     f.write(r.text)
         # import pdb; pdb.set_trace()
 
         return r
+    
+    def get_player_score(self, rival_name, music_level, my_score):
+        score_data = {}
+        if my_score:
+            score_data[music_level] = []
+        else:
+            score_data[music_level] = []
+        self.session.post(self.RIVAL_URL, data={"rival_id": self.rival_ids[rival_name]})
+        page_num = 0
+        while(True):
+            page_num += 1
+            html = self.get_rival_score_page(self.rival_ids[rival_name], music_level, page_num)
+            soup = BeautifulSoup(html.text, "html.parser")
+            music_list = soup.find_all('span', id="music_name")
+            # 存在しないページに飛んだら楽曲データなし
+            if len(music_list) == 0:
+                break
+            music_names = []
+            for name in music_list:
+                music_names.append(name.text)
+            if my_score:
+                player_scores_1 = soup.find_all('td', id="score_col_1")
+                player_scores_2 = soup.find_all('td', id="score_col_2")
+            else:
+                player_scores_1 = soup.find_all('td', id="score_col_3")
+                player_scores_2 = soup.find_all('td', id="score_col_4")
+
+            for i, name in enumerate(music_names):
+                player_score = {
+                    name: {
+                        "NOV": [0, "NP"],
+                        "ADV": [0, "NP"],
+                        "EXH": [0, "NP"],
+                        "MXM": [0, "NP"],
+                        "INF-GRV-HVN": [0, "NP"]
+                    }
+                }
+                for j in range(3):
+                    score = player_scores_1[i*3+j]
+                    if score.text != "--0":
+                        difficulty = self.difficulty[score.findPrevious().text]
+                        player_score[name][difficulty] = [int(score.text), self.clear_mark[score.find("img")["src"][37:]]]
+                for j in range(2):
+                    score = player_scores_2[i*2+j]
+                    if score.text != "--0":
+                        difficulty = self.difficulty[score.findPrevious().text]
+                        player_score[name][difficulty] = [int(score.text), self.clear_mark[score.find("img")["src"][37:]]]
+                score_data[music_level].append(player_score)
+            if my_score:
+                print(f"MY_SCORE:{music_level}-{page_num} 取得完了")
+            else:
+                print(f"{rival_name}:{music_level}-{page_num} 取得完了")
+        if my_score:
+            print(f"MY score level:{music_level} 取得完了")
+        else:
+            print(f"{rival_name} score level:{music_level} 取得完了")
+            
+        return score_data
+
+
     
     def get_my_scores(self, rival_name, music_level):
         my_score_data = {}
         self.session.post(self.RIVAL_URL, data={"rival_id": self.rival_ids[rival_name]})
         my_score_data[music_level] = []
-
-        for i in range(self.level_pages[music_level]):
-            html = self.get_rival_score_page(self.rival_ids[rival_name], music_level, i+1)
+        page_num = 0
+        while(True):
+            page_num += 1
+            html = self.get_rival_score_page(self.rival_ids[rival_name], music_level, page_num)
             soup = BeautifulSoup(html.text, "html.parser")
             music_list = soup.find_all('span', id="music_name")
+            # 存在しないページに飛んだら楽曲データなし
+            if len(music_list) == 0:
+                break
             music_names = []
             for name in music_list:
                 music_names.append(name.text)
@@ -186,6 +239,7 @@ class Saru():
                         difficulty = self.difficulty[score.findPrevious().text]
                         my_score[name][difficulty] = [int(score.text), self.clear_mark[score.find("img")["src"][37:]]]
                 my_score_data[music_level].append(my_score)
+            print(f"{rival_name}:{music_level}-{page_num} 取得完了")
         print(f"my score level:{music_level} 取得完了")
         return my_score_data
 
@@ -195,11 +249,16 @@ class Saru():
         score_data[rival_name] = {}
         self.session.post(self.RIVAL_URL, data={"rival_id": self.rival_ids[rival_name]})
         score_data[rival_name][music_level] = []
+        page_num = 0
 
-        for i in range(self.level_pages[music_level]):
-            html = self.get_rival_score_page(self.rival_ids[rival_name], music_level, i+1)
+        while(True):
+            page_num += 1
+            html = self.get_rival_score_page(self.rival_ids[rival_name], music_level, page_num)
             soup = BeautifulSoup(html.text, "html.parser")
             music_list = soup.find_all('span', id="music_name")
+            # 存在しないページに飛んだら楽曲データなし
+            if len(music_list) == 0:
+                break
             music_names = []
             for name in music_list:
                 music_names.append(name.text)
@@ -237,16 +296,16 @@ class Saru():
         for i, rival_name in enumerate(self.rival_ids.keys()):
             if i == 0:
                 try:
-                    my_score = self.get_my_scores(rival_name, music_level)
-                except RemoteDisconnected as e:
+                    my_score = self.get_player_score(rival_name, music_level, True)
+                except Exception as e:
                     print(e)
                     return False
                 text = json.dumps(my_score, ensure_ascii=False, indent=2)
                 with open("score_data/"+str(music_level)+"/my_score.json", "w", encoding="utf-8") as f:
                     f.write(text)
             try:
-                rival_score = self.get_rival_scores(rival_name, music_level)
-            except RemoteDisconnected as e:
+                rival_score = self.get_player_score(rival_name, music_level, False)
+            except Exception as e:
                 print(e)
                 return False
             text = json.dumps(rival_score, ensure_ascii=False, indent=2)

@@ -1,14 +1,15 @@
 from scrape import Saru
 from create_database import DBManager
 from time import sleep
-
+import sys
 
 
 if __name__ == '__main__':
+    args = sys.argv
     while(True):
-        for music_level in range(17, 21):
+        for music_level in range(int(args[1]),int(args[2])+1):
             saru = Saru("config.yml")
-            for i in [0, 2, 5]:
+            for i in [0, 2, 5, 7, 9]:
                 sleep(i)
                 if saru.login():
                     break
@@ -26,4 +27,5 @@ if __name__ == '__main__':
             else:
                 # コネクションが切れたら最初の難易度からやり直し
                 break
-        sleep(60*60*2)
+        print("数時間後また")
+        sleep(60*60*6)

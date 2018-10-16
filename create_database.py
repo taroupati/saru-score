@@ -13,7 +13,7 @@ class DBManager():
             self.rival_ids[k] = v
 
         import mysql.connector
-        self.conn = mysql.connector.connect(user='root', password='mysql', host='localhost')
+        self.conn = mysql.connector.connect(user='root', password='mysql', host='localhost', port=3306)
         self.cur = self.conn.cursor()
         self.mark_table={
             "NC": 0,
@@ -32,9 +32,9 @@ class DBManager():
         self.cur.execute(f"use {db_name};")
         self.conn.commit()
     
-    def create_table(self, player_name):
+    def create_table(self, player_name, music_level):
         sql = f"""
-            create table {player_name}_SCORE (
+            create table {player_name}_SCORE_{music_level} (
                 曲名 varchar(200),
                 難易度 varchar(20),
                 レベル integer,
@@ -49,9 +49,9 @@ class DBManager():
             return e
         self.conn.commit()
     
-    def reset_database(self, rival_name):
+    def reset_database(self, rival_name, music_level):
         sql = f"""
-            delete from {rival_name}_SCORE;
+            delete from {rival_name}_SCORE_{music_level};
         """
         try:
             self.cur.execute(sql)
@@ -79,13 +79,13 @@ class DBManager():
         # TODO 比較条件の指定
         sql = f"""
             select A.曲名, A.難易度, A.レベル, A.スコア,  A.クリアマーク, B.スコア as スコアB, B.クリアマーク as クリアマークB
-            from MY_SCORE as A
-            join {rival_name}_SCORE as B
+            from MY_SCORE_{music_level} as A
+            join {rival_name}_SCORE_{music_level} as B
             on A.曲名 = B.曲名 AND A.難易度 = B.難易度;
         """
         # pandas でMySQLテーブルを読む
         df_read = pd.read_sql(sql, self.conn)
-        return df_read[((df_read.クリアマーク.map(lambda x:self.mark_table[x]) < df_read.クリアマークB.map(lambda x:self.mark_table[x])) | (df_read.スコア <= df_read.スコアB)) & (df_read.レベル==music_level)]
+        return df_read[(df_read.クリアマーク.map(lambda x:self.mark_table[x]) < df_read.クリアマークB.map(lambda x:self.mark_table[x])) | (df_read.スコア <= df_read.スコアB)]
 
     def get_updated_score(self, table, rival_name, music_level):
         try:
@@ -102,23 +102,23 @@ class DBManager():
     def create_database(self, music_level):
         # debug tableの初期化 
         # TODO updateにした方が良い
-        print(self.reset_database("MY"))
+        print(self.reset_database("MY", music_level))
         for rival_name in self.rival_ids.keys():
-            print(self.reset_database(rival_name))
+            print(self.reset_database(rival_name, music_level))
 
-        print(self.create_table("MY"))
+        print(self.create_table("MY", music_level))
         # ライバルごとのテーブルを作成
         for rival_name in self.rival_ids.keys():
-            print(self.create_table(rival_name))
+            print(self.create_table(rival_name, music_level))
 
         # TODO レベルが文字列で入っちゃってる問題
         with open(f'score_data/{music_level}/my_score.json', encoding="utf-8") as f:
             my_data = json.load(f)
-        self.insert_data("MY_SCORE", my_data[str(music_level)], music_level)
+        self.insert_data(f"MY_SCORE_{music_level}", my_data[str(music_level)], music_level)
         for rival_name in self.rival_ids.keys():
             with open(f'score_data/{music_level}/{rival_name}_score.json', encoding="utf-8") as f:
                 rival_data = json.load(f)
-            self.insert_data(f"{rival_name}_SCORE", rival_data[rival_name][str(music_level)], music_level)
+            self.insert_data(f"{rival_name}_SCORE_{music_level}", rival_data[str(music_level)], music_level)
 
     def compare_score(self, music_level):
         for rival_name in self.rival_ids.keys():
