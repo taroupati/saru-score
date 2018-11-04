@@ -26,6 +26,7 @@ class Saru():
             "HVN": "INF-GRV-HVN"
         }
         self.is_updating = False
+        self.user_id = None
     
     def set_rival_ids(self, rival_ids):
         with open(rival_ids, 'r') as f:

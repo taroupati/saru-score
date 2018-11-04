@@ -18,7 +18,8 @@ dbManager.set_database("SARU_SCORE")
 @respond_to('ライバル')
 def get_rivals(message):
 	if saru.is_updating:
-		message.send("更新中です")
+		if message.body["user"] == saru.user_id:
+			message.send("更新中です")
 	else:
 		text = ""
 		for rival_name, rival_id in saru.rival_ids.items():
@@ -32,7 +33,8 @@ def get_rivals(message):
 @respond_to('登録')
 def set_rival(message):
 	if saru.is_updating:
-		message.send("更新中です")
+		if message.body["user"] == saru.user_id:
+			message.send("更新中です")
 	else:
 		text = message.body["text"]
 		text = text.split(" ")
@@ -52,7 +54,8 @@ def set_rival(message):
 @respond_to('削除')
 def set_rival(message):
 	if saru.is_updating:
-		message.send("更新中です")
+		if message.body["user"] == saru.user_id:
+			message.send("更新中です")
 	else:
 		text = message.body["text"]
 		text = text.split(" ")
@@ -71,12 +74,14 @@ def set_rival(message):
 @respond_to('更新')
 def update_score(message):
 	if saru.is_updating:
-		message.send("更新中です")
+		if message.body["user"] == saru.user_id:
+			message.send("更新中です")
 	else:
 		text = message.body["text"]
 		text = text.split(" ")
 		if len(text) == 3:
 			saru.is_updating = True
+			saru.user_id = message.body["user"]
 			while(True):
 				for music_level in range(int(text[1]),int(text[2])+1):
 					for i in [0, 2, 5, 7, 9]:
