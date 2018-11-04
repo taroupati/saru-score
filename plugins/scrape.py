@@ -25,13 +25,19 @@ class Saru():
             "MXM": "MXM",
             "HVN": "INF-GRV-HVN"
         }
+        self.is_updating = False
     
     def set_rival_ids(self, rival_ids):
         with open(rival_ids, 'r') as f:
             data = yaml.load(f)
         self.rival_ids = {}
+        self.scrape_rivals = {}
         for k, v in data.items():
             self.rival_ids[k] = v
+            self.scrape_rivals[k] = True
+    
+    def set_update_rivals(self, rival_name, flag):
+        self.scrape_rivals[rival_name] = flag
 
     def set_queries(self):
         with open(self.config, 'r') as f:
@@ -62,7 +68,7 @@ class Saru():
         
         import urllib.request
         for i, url in enumerate(image_urls):
-            urllib.request.urlretrieve(url,"imgs/"+str(i)+".png")
+            urllib.request.urlretrieve(url,"plugins/imgs/"+str(i)+".png")
     
     def get_image_values(self, soup):
         divs = soup.find_all("input", style="position:absolute;top:2px;left:2px;width:initial;" )
@@ -79,7 +85,7 @@ class Saru():
         TARGET_FILE = '0.png'
         IMG_SIZE = (100, 100)
 
-        target_img_path = "imgs/" + TARGET_FILE
+        target_img_path = "plugins/imgs/" + TARGET_FILE
         target_img = cv2.imread(target_img_path)
         target_img = cv2.resize(target_img, IMG_SIZE)
         target_hist = cv2.calcHist([target_img], [0], None, [256], [0, 256])
@@ -87,12 +93,12 @@ class Saru():
         # print('TARGET_FILE: %s' % (TARGET_FILE))
 
         scores = {}
-        files = os.listdir("imgs")
+        files = os.listdir("plugins/imgs")
         for i, file in enumerate(files):
             if file == '.DS_Store' or file == TARGET_FILE:
                 continue
 
-            comparing_img_path = "imgs/" + file
+            comparing_img_path = "plugins/imgs/" + file
             comparing_img = cv2.imread(comparing_img_path)
             comparing_img = cv2.resize(comparing_img, IMG_SIZE)
             comparing_hist = cv2.calcHist([comparing_img], [0], None, [256], [0, 256])
@@ -209,7 +215,7 @@ class Saru():
                     print(e)
                     return False
                 text = json.dumps(my_score, ensure_ascii=False, indent=2)
-                with open("score_data/"+str(music_level)+"/my_score.json", "w", encoding="utf-8") as f:
+                with open("plugins/score_data/"+str(music_level)+"/my_score.json", "w", encoding="utf-8") as f:
                     f.write(text)
             try:
                 rival_score = self.get_player_score(rival_name, music_level, False)
@@ -217,7 +223,7 @@ class Saru():
                 print(e)
                 return False
             text = json.dumps(rival_score, ensure_ascii=False, indent=2)
-            with open("score_data/"+str(music_level)+f"/{rival_name}_score.json", "w", encoding="utf-8") as f:
+            with open("plugins/score_data/"+str(music_level)+f"/{rival_name}_score.json", "w", encoding="utf-8") as f:
                 f.write(text)
 
         return True

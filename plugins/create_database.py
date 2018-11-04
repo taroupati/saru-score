@@ -9,8 +9,10 @@ class DBManager():
         with open(rival_ids, 'r') as f:
             data = yaml.load(f)
         self.rival_ids = {}
+        self.update_rivals = {}
         for k, v in data.items():
             self.rival_ids[k] = v
+            self.update_rivals[k] = True
 
         import mysql.connector
         self.conn = mysql.connector.connect(user='root', password='mysql', host='localhost', port=3306)
@@ -28,6 +30,8 @@ class DBManager():
             self.slack_channel = data["channel"]
             self.slack_channel2 = data["channel2"]
 
+    def set_update_rivals(self, rival_name, flag):
+        self.update_rivals[rival_name] = flag
     
     def set_database(self, db_name):
         self.cur.execute(f"use {db_name};")
@@ -59,22 +63,6 @@ class DBManager():
         except Exception as e:
             return e
         self.conn.commit()
-
-    def insert_data(self, table_name, data, music_level):
-        # TODO updateの方法
-        for score_data in data:
-            for music_name, scores in score_data.items():
-                # TODO とりあえずシングルに統一（エスケープシーケンス入れる）
-                music_name = music_name.replace('"', "'")
-                for difficulty, score in scores.items():
-                    if score[0] > 0:
-                        sql = f"""
-                            insert into {table_name} values ("{music_name}", "{difficulty}", {music_level}, {score[0]}, "{score[1]}")
-                        """
-                        # TODO use multiple insert
-                        self.cur.execute(sql)
-                        self.conn.commit()
-        print(f"{table_name} level:{music_level} insert 完了")
     
     def update_score(self, table_name, data, music_level):
         text = None
@@ -134,7 +122,7 @@ class DBManager():
 
     def get_updated_score(self, table, rival_name, music_level):
         try:
-            pre_table = pd.read_csv(f"score_data/{music_level}/{rival_name}.csv", index_col=False)
+            pre_table = pd.read_csv(f"plugins/score_data/{music_level}/{rival_name}.csv", index_col=False)
         except Exception as e:
             print(e)
             return []
@@ -151,11 +139,11 @@ class DBManager():
             print(self.create_table(rival_name, music_level))
 
         # TODO レベルが文字列で入っちゃってる問題
-        with open(f'score_data/{music_level}/my_score.json', encoding="utf-8") as f:
+        with open(f'plugins/score_data/{music_level}/my_score.json', encoding="utf-8") as f:
             my_data = json.load(f)
         self.update_score(f"MY_SCORE_{music_level}", my_data[str(music_level)], music_level)
         for rival_name in self.rival_ids.keys():
-            with open(f'score_data/{music_level}/{rival_name}_score.json', encoding="utf-8") as f:
+            with open(f'plugins/score_data/{music_level}/{rival_name}_score.json', encoding="utf-8") as f:
                 rival_data = json.load(f)
             self.update_score(f"{rival_name}_SCORE_{music_level}", rival_data[str(music_level)], music_level)
 
@@ -169,7 +157,7 @@ class DBManager():
                     text += "・" + row[0] + " (" + row[1] + ", " + str(row[2]) + ")\n" + str(row[5]) + " : " + row[6] + "\n"
                 text += " ``` "
                 self.send_message_to_slack(text)
-            table.to_csv(f"score_data/{music_level}/{rival_name}.csv", index=False)
+            table.to_csv(f"plugins/score_data/{music_level}/{rival_name}.csv", index=False)
 
     def send_message_to_slack(self, text):
         url = "https://slack.com/api/chat.postMessage"
