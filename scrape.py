@@ -55,7 +55,7 @@ class Saru():
         img = div.find('img')
         image_urls = []
         image_urls.append(img["src"])
-
+        
         divs = soup.find_all('img', style="width:100%;vertical-align:bottom")
         for img in divs:
             image_urls.append(img["src"])
